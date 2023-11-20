@@ -1,0 +1,382 @@
+---
+title: "Research Experiment Data Analytics – Project 1"
+author: "Hector Vergel, Ricard Ruiz, Jordi Borraz, Nil Muns"
+date: "2023-11-12"
+output: 
+  html_document:
+    toc: yes
+    number_sections: yes
+    toc_depth: 3
+---
+
+## Introduction
+
+This Data Analysis project explores whether designers and producers are more extroverted than programmers and artists. Using R and the ggplot2 library, we apply the scientific method, A/B testing, and descriptive statistics to analyze Eysenck personality test results. Through concise data preprocessing and inferential statistics, we aim to confirm or reject our hypotheses at 95% and 90% confidence levels. This project serves as a practical learning experience, emphasizing structured R programming, ggplot2 visualization, and the application of statistical concepts.
+
+# Experiment One
+## Research Question
+
+Are designers and producers more extrovert than programmers and artists?
+
+## Draw the Experiment
+
+The independent variable is the professional role, categorized into designers, producers, programmers, and artists.  
+The \ \ dependent \ variable is the level of extroversion measured through the Eysenck personality test.
+
+## Defining the Hypothesis
+
+\ \ \ \ \ \ Null Hypothesis \ \ \ \ \ (H0): Programmers and artists exhibit equal or greater levels of extroversion compared to designers and producers.  
+Alternative Hypothesis (H1): Designers and producers are less extroverted than programmers and artists.
+
+## Preprocessing the Data
+
+The first thing we will do is read the dataset.
+
+```{r}
+ds2019 <- read.csv("eyesench2023 - Class2019.csv")
+ds2021 <- read.csv("eyesench2023 - Class2021.csv")
+ds2022 <- read.csv("eyesench2023 - Class2022.csv")
+ds2023 <- read.csv("eyesench2023 - Class2023.csv")
+```
+
+Then lets modify them to ensure we have no wrong data
+
+```{r}
+# The big dataset 
+ds <- rbind(ds2019, ds2021, ds2022, ds2023)
+
+# Omit the NA
+ds <- na.omit(ds)
+
+# Remove the mixed profiles
+ds <- ds[!grepl("/", ds$Profile), ]
+
+# Profile grammatical error fix
+ds$Profile[ds$Profile == "programmer"] <- "Programmer" 
+ds$Profile[ds$Profile == "Progammer"] <- "Programmer"
+
+# Remove the Student index
+ds$Student = NULL
+
+# Filter and keep only the correct profiles
+ds <- ds[ds$Profile %in% c("Programmer", "Designer", "Artist", "Producer"), ]
+
+```
+
+## Descriptive statistics 
+
+We will be using the ggplot2 library to print the plots in this project.
+
+```{r }
+library(ggplot2)
+```
+
+Lets first see how many students for each profile we have:
+
+```{r }
+ggplot(ds, aes(x = Profile)) + geom_bar(stat = "count", fill = "skyblue") + geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5) + labs(title = "Students for Each Profile", x = "Profile", y = "Students")
+```
+
+
+We can see that there is just one producer, so the sample of Designers/Producers is less than the other. We need to take that into account when comparing both samples.
+
+Now we are going to print a plot to show how the extroversion value is spread in each Profile:
+
+```{r }
+ds$CombinedProfile <- ifelse(ds$Profile %in% c("Artist", "Programmer"), "ArtProg", ifelse(ds$Profile %in% c("Designer", "Producer"), "DesProd", ds$Profile))
+
+ggplot(ds, aes(x = CombinedProfile, y = Extroversion)) + geom_boxplot(fill = "skyblue") + labs(title = "Boxplot of Extroversion by Profile", x = "Profile", y = "Extroversion")
+
+```
+
+
+In this plot we can see that the avarage Extroversion value is pretty similar in both samples. Also, the smallest and highest values are on the ArtProg sample. The DesProd sample is more balanced.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Inferential statistics
+
+We will group the data into two main groups, A for Designers and Producers and B for Programmers and Artists
+
+```{r }
+dsGA <- ds[ds$Profile == "Designer"|ds$Profile == "Producer",]
+dsGB <- ds[ds$Profile == "Programmer"|ds$Profile == "Artist",]
+```
+
+### Mean & Size of Samples
+```{r }
+meandsGA <- mean(dsGA$Extroversion)
+meandsGB <- mean(dsGB$Extroversion)
+sizedsGA <- nrow(dsGA)
+sizedsGB <- nrow(dsGB)
+```
+
+Results:
+```{r }
+meandsGA
+meandsGB
+sizedsGA
+sizedsGB
+```
+
+### Standard Deviations
+```{r }
+stDevdsGA <- sd(dsGA$Extroversion) 
+stDevdsGB <- sd(dsGB$Extroversion) 
+```
+
+Results:
+```{r }
+stDevdsGA
+stDevdsGB
+```
+
+### Observed and Critical Value
+```{r }
+
+# Specific method for observed value and df value
+obsValue <- function(x1, x2, s1, s2, n1, n2){
+  return((x1-x2)/sqrt(((s1^2)/n1) + ((s2^2)/n2)))
+}
+
+dfValue <- function (s1, s2, n1, n2){
+  return(((s1^2/n1)+(s2^2/n2))^2/(((s1^2/n1)^2/(n1-1))+((s2^2/n2)^2/(n2-1)))) 
+}
+
+# Observed value and df value
+obsEx1 <- obsValue(meandsGA,meandsGB, stDevdsGA, stDevdsGB, sizedsGA, sizedsGB)
+dfEx1 <- dfValue(stDevdsGA, stDevdsGB, sizedsGA, sizedsGB)
+
+# Specific method for critical value
+critValue <- function(iSignificanceLevel, iDF, LowerTail){
+  return(qt(iSignificanceLevel, df = iDF, lower.tail = LowerTail))
+}
+
+# Critical value
+crit95Ex1 <- critValue(0.05, dfEx1, FALSE)
+crit90Ex1 <- critValue(0.1, dfEx1, FALSE)
+```
+
+Observed Value:
+```{r }
+obsEx1
+crit95Ex1
+crit90Ex1
+```
+
+Critical 95% Value:
+```{r }
+crit95Ex1
+```
+
+Critical 90% Value:
+```{r }
+crit90Ex1
+```
+
+### The P Value
+```{r }
+
+# Specific method for p Value
+pValue <- function(iZObs, iDF, LowerTail){
+  return(pt(iZObs, df = iDF, lower.tail = LowerTail))
+}
+
+pEx1 <- pValue(obsEx1, dfEx1, FALSE)
+```
+
+Results:
+```{r }
+pEx1
+```
+
+## Confirm or reject the hypotheses
+
+For confirm or reject the hypotheses, the Observed value should be bigger than the Critical value.
+
+```{r }
+cat("Observed Value bigger than Critical Value at 95% CL? ", obsEx1>crit90Ex1)
+cat("Observed Value bigger than Critical Value at 90% CL? ", obsEx1>crit90Ex1)
+cat("P-Value smaller than First Significance Level (0.05)? ", pEx1 < 0.05)
+cat("P-Value smaller than Second Significance Level (0.1)? ", pEx1 < 0.1)
+```
+
+The null hypotheses can't be rejected neither with 95% nor 90% of confidence level.
+
+## Answer the Research Question
+
+Insufficient evidence was uncovered to assert that designers and producers exhibit higher extroversion levels compared to programmers and artists. The observed values and computed p-values, examined at both 95% and 90% confidence levels, failed to support this assertion. Notably, the extroversion values were closely aligned, and unexpectedly, the second group displayed a greater extroversion value than the first group. This observation contradicts our initial alternative hypothesis, further emphasizing the inconclusive nature of the analysis.
+
+# Experiment Two
+## Research Question
+
+Are Male professionals more extrovert than Female?
+
+## Draw the Experiment
+
+The independent variable is the gender assignation, categorized into male and female
+The \ \ dependent \ variable is the level of extroversion measured through the Eysenck personality test.
+
+## Defining the Hypothesis
+
+\ \ \ \ \ \ Null Hypothesis \ \ \ \ \ (H0): Male exhibit equal or greater levels of extroversion compared to Female.
+Alternative Hypothesis (H1): Female are less extroverted than Male.
+
+## Preprocessing the Data
+
+The first thing we will do is read the dataset.
+
+```{r}
+ds2019 <- read.csv("eyesench2023 - Class2019.csv")
+ds2021 <- read.csv("eyesench2023 - Class2021.csv")
+ds2022 <- read.csv("eyesench2023 - Class2022.csv")
+ds2023 <- read.csv("eyesench2023 - Class2023.csv")
+```
+
+Then lets modify them to ensure we have no wrong data
+
+```{r}
+# The big dataset 
+ds <- rbind(ds2019, ds2021, ds2022, ds2023)
+
+# Omit the NA
+ds <- na.omit(ds)
+
+# Remove the mixed profiles
+ds <- ds[!grepl("/", ds$Profile), ]
+
+# Sex gender indicator lower case fix
+ds$Sex[ds$Sex == "f"] <- "F"
+ds$Sex[ds$Sex == "m"] <- "M"
+
+# Remove the Student index
+ds$Student = NULL
+
+# Filter and keep only the correct genders
+ds <- ds[ds$Sex %in% c("M", "F"), ]
+
+```
+
+## Descriptive statistics 
+
+We will be using the ggplot2 library to print the plots in this project.
+
+```{r }
+library(ggplot2)
+```
+
+Lets first see how many students for each gender we have:
+
+```{r }
+ggplot(ds, aes(x = Sex)) + geom_bar(stat = "count", fill = "skyblue") + geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5) + labs(title = "Students for Each Gender", x = "Gender", y = "Students")
+```
+
+We can see that there is more than the double of males than females.  
+Now we are going to print a plot to show how the extroversion value is spread in each Profile:
+
+```{r }
+ds$CombinedProfile <- ifelse(ds$Sex %in% c("M"), "Male", ifelse(ds$Sex %in% c("F"), "Female", ds$Sex))
+
+ggplot(ds, aes(x = CombinedProfile, y = Extroversion)) + geom_boxplot(fill = "skyblue") + labs(title = "Boxplot of Extroversion by Gender", x = "Gender", y = "Extroversion")
+```
+
+In this plot we can see that the avarage Extroversion value is pretty bigger in Famale sample.
+
+## Inferential statistics
+
+We will group the data into two main groups, A for Male and B for Female
+
+```{r }
+dsGA <- ds[ds$Sex == "M",]
+dsGB <- ds[ds$Sex == "F",]
+```
+
+
+### Mean & Size of Samples
+```{r }
+meandsGA <- mean(dsGA$Extroversion)
+meandsGB <- mean(dsGB$Extroversion)
+sizedsGA <- nrow(dsGA)
+sizedsGB <- nrow(dsGB)
+```
+
+Results:
+```{r }
+meandsGA
+meandsGB
+sizedsGA
+sizedsGB
+```
+
+### Standard Deviations
+```{r }
+stDevdsGA <- sd(dsGA$Extroversion) 
+stDevdsGB <- sd(dsGB$Extroversion) 
+```
+
+Results:
+```{r }
+stDevdsGA
+stDevdsGB
+```
+
+### Observed and Critical Value
+```{r }
+# Observed value and df value
+obsEx2 <- obsValue(meandsGA,meandsGB, stDevdsGA, stDevdsGB, sizedsGA, sizedsGB)
+dfEx2 <- dfValue(stDevdsGA, stDevdsGB, sizedsGA, sizedsGB)
+
+# Critical value
+crit95Ex2 <- critValue(0.05, dfEx2, FALSE)
+crit90Ex2 <- critValue(0.1, dfEx2, FALSE)
+```
+
+Observed Value:
+```{r }
+obsEx2
+crit95Ex2
+crit90Ex2
+```
+
+Critical 95% Value:
+```{r }
+crit95Ex2
+```
+
+Critical 90% Value:
+```{r }
+crit90Ex2
+```
+
+### The P Value
+```{r }
+pEx2 <- pValue(obsEx2, dfEx2, FALSE)
+```
+
+Results:
+```{r }
+pEx2
+```
+
+## Confirm or reject the hypotheses
+
+For confirm or reject the hypotheses, the Observed value should be bigger than the Critical value.
+
+```{r }
+cat("Observed Value bigger than Critical Value at 95% CL? ", obsEx2 > crit90Ex2)
+cat("Observed Value bigger than Critical Value at 90% CL? ", obsEx2 > crit90Ex2)
+cat("P-Value smaller than First Significance Level (0.05)? ", pEx2 < 0.05)
+cat("P-Value smaller than Second Significance Level (0.1)? ", pEx2 < 0.1)
+```
+
+The null hypotheses can't be rejected neither with 95% nor 90% of confidence level.
+
+## Answer the Research Question
+
+There isn't enough evidence to claim that females demonstrate higher levels of extroversion than males. Despite evaluating the observed values and calculating p-values at 95% and 90% confidence levels, we couldn't substantiate this assertion. Notably, the extroversion values were closely similar, and surprisingly, the male group exhibited an even greater extroversion value than the female group. This discovery contradicts our initial alternative hypothesis, underscoring the analysis's inconclusive nature regarding gender disparities.
+
+# Summary
+
+In this data analysis project, we investigated extroversion levels among professionals, exploring both role-based and gender-based differences. For designers and producers versus programmers and artists, the analysis found inconclusive evidence, with extroversion values closely aligned. Surprisingly, the second group exhibited even greater extroversion. Similarly, the study on male versus female professionals revealed no significant differences in extroversion levels. Both experiments failed to reject the null hypotheses, highlighting the nuanced nature of personality traits within professional contexts.
